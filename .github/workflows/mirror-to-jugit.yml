@@ -31,4 +31,8 @@ jobs:
           # Build remote URL and push
           REMOTE="https://oauth2:${GITLAB_TOKEN}@${JUGIT_URL#https://}"
           git remote add jugit "$REMOTE"
-          git push jugit --mirror
+              # Push all branches safely
+          git push --prune --all jugit
+
+          # Push all tags
+          git push --tags jugit
