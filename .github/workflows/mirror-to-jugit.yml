@@ -29,6 +29,6 @@ jobs:
           echo "JuGit URL: ${JUGIT_URL}"
 
           # Build remote URL and push
-          REMOTE="https://oauth2:${GITLAB_TOKEN}@${JUGIT_URL#https://}"
+          REMOTE="https://${{ secrets.JUGIT_USERNAME }}:${GITLAB_TOKEN}@${JUGIT_URL#https://}"
           git remote add jugit "$REMOTE"
           git push jugit --mirror
