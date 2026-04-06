@@ -1,0 +1,627 @@
+\documentclass[12pt, a4paper]{article}
+
+% ── Packages ──────────────────────────────────────────────────────────────────
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{times}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{amsmath, amssymb}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{titlesec}
+\usepackage{abstract}
+\usepackage{parskip}
+\usepackage{microtype}
+\usepackage{cite}
+\usepackage{url}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{tabularx}
+
+% ── Hyperref Configuration ─────────────────────────────────────────────────────
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!70!black,
+    citecolor=blue!70!black,
+    urlcolor=blue!70!black,
+    pdftitle={Design and Development of an Intelligent ArXiv Research Paper Ingestion Agent with RAG-Based Retrieval},
+    pdfauthor={},
+}
+
+% ── Listings (code) ────────────────────────────────────────────────────────────
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    backgroundcolor=\color{gray!8},
+    keywordstyle=\color{blue!70!black}\bfseries,
+    commentstyle=\color{green!50!black},
+    stringstyle=\color{red!70!black},
+    numbers=left,
+    numberstyle=\tiny\color{gray},
+    numbersep=6pt,
+    captionpos=b,
+}
+
+% ── Section Formatting ─────────────────────────────────────────────────────────
+\titleformat{\section}{\large\bfseries}{\thesection.}{0.5em}{}
+\titleformat{\subsection}{\normalsize\bfseries}{\thesubsection.}{0.5em}{}
+\titleformat{\subsubsection}{\normalsize\itshape}{\thesubsubsection.}{0.5em}{}
+
+% ── Title Block ────────────────────────────────────────────────────────────────
+\title{%
+    \textbf{Design and Development of an Intelligent ArXiv Research Paper
+    Ingestion Agent with RAG-Based Retrieval} \\[0.4em]
+    \large Monthly Progress Report --- March 2026
+}
+
+\author{
+    Omar S.\\[0.2em]
+    \small Supervised Research Project \\
+    \small \textit{Department of Computer Science} \\[0.4em]
+    \small \texttt{April 2026}
+}
+
+\date{}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\begin{document}
+\maketitle
+\thispagestyle{empty}
+
+% ── Abstract ──────────────────────────────────────────────────────────────────
+\begin{abstract}
+This report documents one month of iterative design and development of an
+intelligent agent system for the ingestion, processing, and retrieval of
+ArXiv research papers. Beginning from a conceptual prototype, the system
+evolved through three weekly iterations into a containerised, RAG-enabled
+pipeline comprising a natural-language query interface, a PDF extraction
+layer, an embedding store, and a vector-similarity retrieval component.
+The report covers the architectural decisions made at each iteration,
+evaluates the PDF parsing tools examined (PDFPlumber, PyMuPDF, and
+Docling), describes the chunking and embedding strategies adopted, and
+identifies planned directions toward a metadata-driven advanced RAG
+framework. The technology stack is grounded in LangChain, LangGraph,
+Sentence Transformers, ChromaDB, and the GROQ inference API.
+
+\noindent\textbf{Keywords:} ArXiv; LLM agents; Retrieval-Augmented Generation;
+PDF extraction; vector databases; LangGraph; ChromaDB; document ingestion.
+\end{abstract}
+
+\vspace{1em}
+\hrule
+\vspace{1.5em}
+
+% ── TOC ───────────────────────────────────────────────────────────────────────
+\tableofcontents
+\newpage
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Introduction}
+\label{sec:intro}
+
+The exponential growth of scientific literature hosted on repositories such
+as ArXiv necessitates intelligent tools capable of going beyond keyword
+search: tools that understand natural-language intent, locate semantically
+relevant documents, and synthesise coherent answers from their content.
+Retrieval-Augmented Generation (RAG) \cite{lewis2020rag} provides a
+principled framework for grounding large language model (LLM) outputs in
+external, verifiable documents, thereby mitigating hallucination while
+preserving the fluency of generative responses.
+
+This project aims to design and implement such a system --- an
+\emph{ArXiv Research Paper Ingestion Agent} --- that operates as an
+end-to-end pipeline from user query to cited, contextualised response.
+The development follows an iterative software-engineering methodology
+with weekly enhancement cycles.
+
+The remainder of this report is structured as follows. Section~\ref{sec:background}
+reviews the relevant background and related work. Section~\ref{sec:arch}
+presents the overall system architecture. Sections~\ref{sec:week1}--\ref{sec:week3}
+detail the work accomplished in each of the three development weeks.
+Section~\ref{sec:eval} evaluates the tools and strategies explored.
+Section~\ref{sec:future} outlines future directions, and
+Section~\ref{sec:conclusion} concludes.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Background and Related Work}
+\label{sec:background}
+
+\subsection{Retrieval-Augmented Generation}
+
+Retrieval-Augmented Generation (RAG), introduced by Lewis et al.\
+\cite{lewis2020rag}, combines a parametric language model with a
+non-parametric dense retriever to condition generation on retrieved
+passages. The architecture has since been extended in multiple directions,
+including iterative retrieval \cite{shi2024iter}, graph-based
+knowledge integration \cite{edge2024graphrag}, and
+metadata-filtered retrieval. The present project implements a standard
+(Simple RAG) pipeline as its baseline before advancing toward a
+metadata-driven variant.
+
+\subsection{Scientific Document Processing}
+
+Processing scientific PDFs presents well-known challenges: multi-column
+layouts, mathematical notation, figures, and tables require robust parsers
+that go beyond na\"{i}ve text extraction. Prior work has evaluated tools
+such as GROBID \cite{lopez2009grobid}, PDFMiner, and more recently
+Docling \cite{docling2024} for structured extraction from scholarly
+documents. Evaluation of these tools under practical conditions forms a
+central contribution of this report.
+
+\subsection{Agentic Frameworks for Information Retrieval}
+
+The emergence of LLM-based agent frameworks --- LangChain \cite{langchain},
+LangGraph \cite{langgraph} --- enables the construction of multi-step
+reasoning pipelines where tools (e.g., an ArXiv API wrapper, a vector
+store, a PDF parser) are invoked dynamically based on model decisions.
+This paradigm underpins the agent design described herein.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{System Architecture}
+\label{sec:arch}
+
+\subsection{High-Level Overview}
+
+The system adopts a modular \emph{fan-out / fan-in} pattern orchestrated
+by a LangGraph state machine. At a high level the pipeline consists of
+five stages:
+
+\begin{enumerate}[leftmargin=*, label=\textbf{\arabic*.}]
+    \item \textbf{Query Parser} --- Translates a natural-language user
+          query into structured search parameters (title, author, abstract
+          keywords, category codes, date ranges) compatible with the
+          ArXiv Atom API.
+    \item \textbf{Source Router} --- Routes incoming requests to the
+          appropriate retrieval source: the live ArXiv API or a locally
+          ingested document corpus.
+    \item \textbf{Document Ingestion Pipeline} --- Downloads and processes
+          PDF documents via a three-stage sub-pipeline:
+          \emph{extraction} $\rightarrow$ \emph{chunking}
+          $\rightarrow$ \emph{embedding and storage}.
+    \item \textbf{Retrieval Engine} --- Performs vector-similarity search
+          against the embedded corpus stored in ChromaDB.
+    \item \textbf{Response Aggregator} --- Synthesises a coherent,
+          cited answer from the retrieved chunks using an LLM.
+\end{enumerate}
+
+\subsection{Technology Stack}
+
+Table~\ref{tab:stack} summarises the principal technologies employed.
+
+\begin{table}[H]
+    \centering
+    \caption{Technology stack employed in the ArXiv Ingestion Agent.}
+    \label{tab:stack}
+    \begin{tabularx}{\linewidth}{@{}l l X@{}}
+        \toprule
+        \textbf{Component} & \textbf{Technology} & \textbf{Role} \\
+        \midrule
+        LLM Inference & GROQ API & Cloud-hosted, low-latency LLM serving \\
+        LLM (local) & Ollama & On-device model hosting for offline use \\
+        Agent Framework & LangGraph + LangChain & Agent orchestration and tool binding \\
+        PDF Extraction & PyMuPDF (\texttt{pymupdf4llm}) & Primary text extraction from PDFs \\
+        Embedding Model & Sentence Transformers (HuggingFace) & Dense vector representation \\
+        Vector Store & ChromaDB & Local vector database with similarity search \\
+        ArXiv Interface & ArXiv Python API / feedparser & Metadata and full-text retrieval \\
+        Containerisation & Docker & Reproducible deployment \\
+        IDE / Dev & VS Code & Development environment \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Week 1: Prototyping and Architectural Design}
+\label{sec:week1}
+
+\subsection{Objectives}
+
+The first development week was dedicated to establishing a conceptual
+baseline and producing a working prototype agent capable of answering
+queries via the ArXiv metadata API. Discussions with the supervising
+researcher provided key requirements that shaped the subsequent design.
+
+\subsection{Architectural Workflow Design}
+
+An initial architectural workflow was drafted based on the fan-out/fan-in
+pattern described in Section~\ref{sec:arch}. The core data flow was
+defined as:
+
+\[
+  \texttt{Query Parser} \;\longrightarrow\; \texttt{ArXiv Search}
+  \;\longrightarrow\; \texttt{Agent(s)}
+  \;\longrightarrow\; \texttt{Response Aggregator}
+\]
+
+This decomposition enforces a clean separation of concerns and allows
+individual components to be upgraded independently --- a design principle
+that proved valuable in subsequent iterations.
+
+\subsection{ArXiv Repositories Agent}
+
+The prototype agent translates free-form natural-language queries into
+structured ArXiv API search parameters. Specifically, the query parser
+identifies and maps the following fields:
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Title} (\texttt{ti:}) --- keywords extracted from the
+          query targeting the paper title.
+    \item \textbf{Author} (\texttt{au:}) --- author names where mentioned.
+    \item \textbf{Abstract} (\texttt{abs:}) --- semantic keywords for
+          abstract matching.
+    \item \textbf{Category} (\texttt{cat:}) --- ArXiv subject classification
+          codes (e.g., \texttt{cs.AI}, \texttt{cs.CL}).
+    \item \textbf{Date range} (\texttt{submittedDate:}) --- temporal
+          constraints expressed in the query.
+\end{itemize}
+
+Responses returned to the user include: paper titles, author lists,
+abstracts, publication dates, and direct hyperlinks to the ArXiv landing
+pages.
+
+\subsection{Initial Codebase}
+
+The codebase was structured as a modular Python project. Core modules
+implemented during this week included:
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Query parsing module} --- LLM-driven extraction of
+          structured fields from a natural-language query.
+    \item \textbf{ArXiv API integration layer} --- wrapper around the
+          ArXiv Atom feed using \texttt{feedparser} and \texttt{requests}.
+    \item \textbf{LLM tool definitions} --- LangChain tool objects
+          exposing search and metadata functions to the agent.
+    \item \textbf{Response formatter} --- template-based rendering of
+          retrieved metadata into human-readable output.
+\end{itemize}
+
+Initial testing was performed against both a locally hosted LLM via
+Ollama and the GROQ cloud inference API, validating that the agent
+architecture is backend-agnostic.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Week 2: Document Processing Pipeline}
+\label{sec:week2}
+
+\subsection{Objectives}
+
+The second iteration extended the system beyond metadata retrieval to
+full-document ingestion. The key deliverables were: a version-controlled
+repository, a PDF extraction component, an embedding pipeline, and a
+stored vector index ready for retrieval.
+
+\subsection{Repository and Version Control}
+
+A GitLab repository was created, and the existing codebase was pushed
+with a structured \texttt{README} documenting the agent architecture,
+component descriptions, and setup instructions. This established the
+collaborative baseline for subsequent development.
+
+\subsection{PDF Extraction Component}
+
+PyMuPDF (\texttt{pymupdf4llm}) was selected as the primary PDF
+extraction library following a comparative evaluation (detailed in
+Section~\ref{sec:eval}). The extraction module:
+
+\begin{itemize}[leftmargin=*]
+    \item Ingests a PDF document from a local path or a URL.
+    \item Extracts the textual content page-by-page.
+    \item Exports the structured text to a markup file (\texttt{.md})
+          for downstream processing, using an agentic tool to persist the
+          intermediate artefact.
+\end{itemize}
+
+\subsection{Agent Routing}
+
+A \emph{source router} node was added to the LangGraph state machine.
+This node classifies each incoming request as one of:
+
+\begin{description}[leftmargin=*]
+    \item[\texttt{arxiv\_live}] Queries answered via live ArXiv API calls.
+    \item[\texttt{local\_document}] Queries answered from the locally
+          ingested and embedded document corpus.
+\end{description}
+
+The routing decision is driven by an LLM classifier that analyses the
+user intent and the available data sources.
+
+\subsection{Document Chunking}
+
+After extraction, text is split into overlapping fixed-length chunks
+using LangChain's \texttt{RecursiveCharacterTextSplitter}. While this
+simple chunking strategy is functional, it does not respect semantic
+boundaries. Semantic chunking --- which aligns chunk boundaries with
+topic transitions --- is identified as a near-term improvement
+(Section~\ref{sec:future}).
+
+\subsection{Embedding and Vector Storage}
+
+Sentence-level embeddings are generated using a Sentence Transformer
+model from the HuggingFace \texttt{sentence-transformers} library.
+The resulting dense vectors, together with the original text chunks
+and document-level metadata, are persisted in a ChromaDB collection
+for efficient approximate nearest-neighbour search.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Week 3: Retrieval Pipeline and Containerisation}
+\label{sec:week3}
+
+\subsection{Objectives}
+
+The third iteration closed the loop from ingestion to answer generation
+by implementing the retrieval pipeline and completing the Docker
+containerisation for reproducible deployment.
+
+\subsection{Retrieval Pipeline}
+
+The retrieval component integrates similarity search directly into the
+LangGraph agent workflow. Upon receiving a query, the pipeline:
+
+\begin{enumerate}[leftmargin=*, label=\textbf{\arabic*.}]
+    \item Embeds the query using the same Sentence Transformer model used
+          at ingestion time, ensuring vector-space consistency.
+    \item Issues a $k$-nearest-neighbour query against the ChromaDB
+          collection.
+    \item Ranks and filters results by cosine similarity score.
+    \item Packages the top-$k$ chunks as context for the LLM response
+          generator.
+\end{enumerate}
+
+The result is a functional Simple RAG architecture \cite{lewis2020rag}
+providing grounded, document-backed answers with low hallucination risk.
+
+\subsection{Containerisation}
+
+The full agent stack --- including the Python application, ChromaDB, and
+the Sentence Transformer inference server --- was containerised using
+Docker. A multi-service \texttt{docker-compose} configuration was defined,
+enabling a single-command deployment of the entire pipeline. This
+significantly reduces environment-related friction and aligns with
+best practices for reproducible research software.
+
+\subsection{System Diagrams}
+
+Detailed workflow diagrams, abstract architectural charts, and system
+flow diagrams were produced this week to document the internal state
+transitions of the LangGraph agent, the data flow through the ingestion
+pipeline, and the interaction between the retrieval and generation
+components.
+
+\subsection{Literature Reviews Conducted}
+
+Three areas of related literature were surveyed this week:
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{Metadata extraction methods}: MeExtract and related
+          structured-extraction pipelines from scientific PDFs.
+    \item \textbf{RAG pipeline comparison}: Simple RAG graphs versus
+          graph-augmented retrieval \cite{edge2024graphrag}.
+    \item \textbf{Advanced RAG}: Iterative and adaptive retrieval
+          strategies relevant to the planned metadata-driven extension.
+\end{itemize}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Evaluation of PDF Parsing Tools}
+\label{sec:eval}
+
+Three PDF parsing libraries were evaluated during Week~2 on a test corpus
+of ArXiv papers spanning diverse layouts (single-column, double-column,
+figures-heavy, and tables-heavy documents). Table~\ref{tab:parsers}
+summarises the comparative findings.
+
+\begin{table}[H]
+    \centering
+    \caption{Comparative evaluation of PDF parsing libraries.}
+    \label{tab:parsers}
+    \begin{tabularx}{\linewidth}{@{}l X X X@{}}
+        \toprule
+        \textbf{Library} & \textbf{Strengths} & \textbf{Weaknesses} & \textbf{Selected?} \\
+        \midrule
+        \textbf{PDFPlumber} &
+            Simple API; accurate for single-column, text-only PDFs &
+            Struggles with multi-column layouts, embedded images, and tables; low recall on complex documents &
+            No \\[0.4em]
+        \textbf{PyMuPDF} (\texttt{pymupdf4llm}) &
+            Fast; good handling of multi-column layouts; LLM-optimised markdown output; lightweight &
+            Limited table reconstruction fidelity in some edge cases &
+            \textbf{Yes} \\[0.4em]
+        \textbf{Docling} &
+            Best overall structural extraction; handles tables and figures well &
+            Heavy resource footprint; longer processing time; occasional disordered output on complex layouts &
+            Candidate for future use \\
+        \bottomrule
+    \end{tabularx}
+\end{table}
+
+PyMuPDF was selected as the primary extractor due to its favourable
+balance of speed, extraction quality, and its native LLM-oriented
+markdown output format (\texttt{pymupdf4llm}). Docling remains a
+candidate for a future high-fidelity extraction mode where processing
+time is less critical.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Future Directions}
+\label{sec:future}
+
+The following enhancements are planned for the next development phase:
+
+\subsection{Semantic Chunking}
+
+The current fixed-length chunking strategy is known to split semantically
+coherent passages at arbitrary boundaries, degrading retrieval precision.
+Semantic chunking methods --- which detect topic transitions and align
+chunk boundaries accordingly --- will be investigated and implemented.
+A dedicated Jupyter notebook will be developed to evaluate and visualise
+chunk quality under both strategies.
+
+\subsection{Metadata-Driven RAG}
+
+The system will be extended from a Simple RAG baseline to a
+\emph{metadata-driven RAG} architecture. This involves:
+
+\begin{itemize}[leftmargin=*]
+    \item Storing rich document-level metadata (title, authors, venue,
+          year, ArXiv category, citation count) alongside the chunk
+          embeddings.
+    \item Enabling metadata-filtered retrieval queries that constrain the
+          search space prior to embedding-based similarity ranking.
+    \item Integrating structured metadata extraction pipelines (e.g.,
+          MeExtract-style approaches) to populate these fields
+          automatically.
+\end{itemize}
+
+\subsection{Microsoft GraphRAG Integration}
+
+Microsoft GraphRAG \cite{edge2024graphrag} constructs a knowledge graph
+from the document corpus and enables community-level summarisation,
+offering qualitatively different retrieval semantics from dense vector
+search. An exploratory integration is planned to evaluate whether
+graph-based context retrieval improves answer quality for multi-hop
+reasoning queries.
+
+\subsection{API-Based Storage and External Database}
+
+Current deployment stores all data locally. Future iterations will
+expose a REST API for document ingestion and retrieval, and evaluate
+managed vector database services (e.g., Qdrant) for scalability and
+additional filtering features.
+
+\subsection{Parser Refinement}
+
+A systematic Jupyter notebook-based evaluation will compare PDFPlumber,
+PyMuPDF, and Docling across a larger benchmark corpus, providing
+quantitative extraction quality metrics (character error rate, structural
+recall) to inform future parser selection.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Planned Literature Survey}
+\label{sec:lit}
+
+The following papers have been identified for close review in the
+upcoming development period:
+
+\begin{enumerate}[leftmargin=*, label={[\arabic*]}]
+    \item \textit{MIRIAD: Augmenting LLMs with Millions of Medical
+          Query-Response Pairs} \cite{miriad2025} --- domain-specific
+          QA dataset construction at scale; relevance to curating
+          ArXiv-derived QA pairs.
+    \item \textit{Agent-based Multimodal Information Extraction for
+          Nanomaterials} \cite{agentnano2025} --- multi-modal agentic
+          extraction; relevance to handling figures and equations in
+          scientific PDFs.
+    \item \textit{PDFChatAnnotator: A Human-LLM Collaborative
+          Multi-Modal Data Collection Tool for PDF-Format Catalogs}
+          \cite{pdfchat2024} --- human-in-the-loop annotation of
+          PDF content; relevance to ground-truth construction for
+          extraction evaluation.
+\end{enumerate}
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section{Conclusion}
+\label{sec:conclusion}
+
+Over the course of three iterative development weeks, the ArXiv Research
+Paper Ingestion Agent evolved from a conceptual prototype into a
+containerised, end-to-end RAG pipeline. Key contributions include:
+
+\begin{itemize}[leftmargin=*]
+    \item A modular, LangGraph-orchestrated agent architecture supporting
+          both live ArXiv metadata queries and locally ingested PDF
+          corpora.
+    \item A comparative evaluation of three PDF extraction libraries,
+          resulting in the adoption of PyMuPDF as the primary parser.
+    \item An embedding and vector-storage pipeline using Sentence
+          Transformers and ChromaDB.
+    \item A functional similarity-search retrieval component completing
+          the Simple RAG loop.
+    \item A fully containerised deployment via Docker.
+\end{itemize}
+
+The system currently provides grounded, document-backed conversational
+responses via the GROQ inference API. Planned extensions toward
+semantic chunking, metadata-driven retrieval, and graph-augmented RAG
+will progressively increase both the depth and precision of the
+system's research assistance capabilities.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\section*{Acknowledgements}
+
+The author thanks the supervising researcher for guidance on system
+requirements and for productive discussions that shaped the architectural
+decisions documented in this report.
+
+% ══════════════════════════════════════════════════════════════════════════════
+\bibliographystyle{ieeetr}
+\begin{thebibliography}{99}
+
+\bibitem{lewis2020rag}
+P.\ Lewis, E.\ Perez, A.\ Piktus, F.\ Petroni, V.\ Karpukhin,
+N.\ Goyal, H.\ K\"{u}ttler, M.\ Lewis, W.\ Yih, T.\ Rockt\"{a}schel,
+S.\ Riedel, and D.\ Kiela,
+``Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks,''
+in \textit{Advances in Neural Information Processing Systems (NeurIPS)},
+vol.~33, pp.~9459--9474, 2020.
+
+\bibitem{shi2024iter}
+W.\ Shi, S.\ Min, M.\ Yasunaga, M.\ Seo, R.\ James, M.\ Lewis,
+L.\ Zettlemoyer, and W.\ Yih,
+``REPLUG: Retrieval-Augmented Language Model Pre-Training,''
+in \textit{Proc.\ NAACL}, 2023.
+
+\bibitem{edge2024graphrag}
+D.\ Edge, H.\ Trinh, N.\ Cheng, J.\ Bradley, A.\ Chao,
+A.\ Mody, S.\ Truitt, and J.\ Larson,
+``From Local to Global: A Graph RAG Approach to Query-Focused
+Summarization,''
+\textit{arXiv preprint arXiv:2404.16130}, 2024.
+
+\bibitem{lopez2009grobid}
+P.\ Lopez,
+``GROBID: Combining Automatic Bibliographic Data Recognition and
+Term Extraction for Scholarship Publications,''
+in \textit{Proc.\ 13th European Conference on Digital Libraries
+(ECDL)}, pp.~473--474, 2009.
+
+\bibitem{docling2024}
+IBM Research,
+``Docling: An Open-Source Document Conversion Toolkit,''
+\textit{GitHub Repository}, \url{https://github.com/DS4SD/docling}, 2024.
+
+\bibitem{langchain}
+H.\ Chase,
+``LangChain: Building Applications with Large Language Models,''
+\textit{GitHub Repository}, \url{https://github.com/langchain-ai/langchain}, 2022.
+
+\bibitem{langgraph}
+LangChain AI,
+``LangGraph: Stateful, Multi-Actor Applications with LLMs,''
+\textit{GitHub Repository}, \url{https://github.com/langchain-ai/langgraph}, 2024.
+
+\bibitem{miriad2025}
+[Authors],
+``MIRIAD: Augmenting LLMs with Millions of Medical Query-Response Pairs,''
+\textit{arXiv preprint arXiv:2506.06091}, 2025.
+
+\bibitem{agentnano2025}
+[Authors],
+``Agent-based Multimodal Information Extraction for Nanomaterials,''
+\textit{npj Computational Materials}, 2025.
+\url{https://www.nature.com/articles/s41524-025-01674-7}
+
+\bibitem{pdfchat2024}
+[Authors],
+``PDFChatAnnotator: A Human-LLM Collaborative Multi-Modal Data
+Collection Tool for PDF-Format Catalogs,''
+in \textit{Proc.\ ACM IUI}, 2024.
+\url{https://dl.acm.org/doi/10.1145/3640543.3645174}
+
+\end{thebibliography}
+
+\end{document}
