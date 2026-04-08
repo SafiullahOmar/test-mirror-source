@@ -21,7 +21,7 @@ jobs:
 
       - name: Push mirror to JuGit
         env:
-          GITLAB_TOKEN: ${{ secrets.JUGIT_TOKEN }}
+         
           JUGIT_URL: ${{ secrets.JUGIT_REPO_URL }}
         run: |
           
