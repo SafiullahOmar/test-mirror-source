@@ -4,10 +4,10 @@ on:
   push:
     branches: ['**']
     tags: ['**']
-  delete:                  # keeps branch/tag deletions in sync too
+  delete:                  
   schedule:
-    - cron: '0 2 * * *'   # every day at 02:00 UTC  ← adjust as needed
-  workflow_dispatch:       # allows manual trigger from GitHub UI
+    - cron: '0 2 * * *'
+  workflow_dispatch:       
 
 jobs:
   mirror:
@@ -16,23 +16,23 @@ jobs:
       - name: Checkout full mirror
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0      # full history
-          fetch-tags: true    # all tags
+          fetch-depth: 0      
+          fetch-tags: true   
 
       - name: Push mirror to JuGit
         env:
           GITLAB_TOKEN: ${{ secrets.JUGIT_TOKEN }}
           JUGIT_URL: ${{ secrets.JUGIT_REPO_URL }}
         run: |
-          # Debug: verify token and URL are loaded (never prints the token value)
+          
           echo "Token length: ${#GITLAB_TOKEN}"
           echo "JuGit URL: ${JUGIT_URL}"
 
-          # Build remote URL and push
+          
           REMOTE="https://oauth2:${GITLAB_TOKEN}@${JUGIT_URL#https://}"
           git remote add jugit "$REMOTE"
-              # Push all branches safely
+              
           git push --prune --all jugit
 
-          # Push all tags
+          
           git push --tags jugit
